@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Defect Helper — ตัวช่วยเขียน Bug Report</title>
+<style>
+  :root {
+    --bg: #0f1419; --panel: #1a2028; --panel2: #222b35; --line: #2d3742;
+    --txt: #e6edf3; --muted: #8b98a5; --accent: #4a9eff;
+    --done: #3fb950; --blocked: #e05561; --warn: #d9a441;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; background: var(--bg); color: var(--txt);
+    font-family: -apple-system, "Segoe UI", "Noto Sans Thai", Tahoma, sans-serif;
+    line-height: 1.55; font-size: 15px;
+  }
+  .wrap { max-width: 1280px; margin: 0 auto; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+  h2 { font-size: 16px; margin: 0 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .layout { display: grid; grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; }
+
+  label { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 4px; color: var(--txt); }
+  label:first-of-type { margin-top: 0; }
+  .hint { color: var(--muted); font-size: 12px; margin: 0 0 6px; font-style: italic; }
+  input[type="text"], textarea, select {
+    width: 100%; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px;
+    color: var(--txt); padding: 8px 10px; font-family: inherit; font-size: 14px; resize: vertical;
+  }
+  input[type="text"]:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
+  textarea { min-height: 56px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .steps-list { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+  .step-row { display: flex; align-items: center; gap: 8px; }
+  .step-num { color: var(--muted); font-size: 13px; width: 20px; flex-shrink: 0; text-align: right; }
+  .step-row input[type="text"] { flex: 1; }
+  .step-del {
+    flex-shrink: 0; background: rgba(224,85,97,.15); color: var(--blocked); border: 1px solid rgba(224,85,97,.3);
+    border-radius: 6px; width: 28px; height: 28px; cursor: pointer; font-size: 14px; line-height: 1;
+  }
+  .step-del:hover { background: rgba(224,85,97,.3); }
+  .btn-add {
+    margin-top: 8px; background: rgba(74,158,255,.12); color: var(--accent); border: 1px solid rgba(74,158,255,.3);
+    border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px; font-weight: 600;
+  }
+  .btn-add:hover { background: rgba(74,158,255,.22); }
+
+  .btn-generate {
+    margin-top: 20px; width: 100%; background: var(--accent); color: #08131f; border: none;
+    border-radius: 8px; padding: 12px; cursor: pointer; font-size: 15px; font-weight: 700;
+  }
+  .btn-generate:hover { filter: brightness(1.08); }
+
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .lang-toggle { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .lang-toggle button {
+    background: var(--panel2); color: var(--muted); border: none; padding: 6px 14px; cursor: pointer; font-size: 13px; font-weight: 600;
+  }
+  .lang-toggle button.active { background: var(--accent); color: #08131f; }
+
+  .score-box { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+  .score-num { font-size: 30px; font-weight: 800; }
+  .score-good { color: var(--done); } .score-mid { color: var(--warn); } .score-bad { color: var(--blocked); }
+  .score-bar { flex: 1; height: 10px; background: var(--panel2); border-radius: 5px; overflow: hidden; }
+  .score-bar > span { display: block; height: 100%; border-radius: 5px; transition: width .2s ease; }
+
+  .checklist { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+  .check-item {
+    display: flex; align-items: flex-start; gap: 8px; padding: 7px 10px; border-radius: 6px; font-size: 13px;
+  }
+  .check-pass { background: rgba(63,185,80,.1); color: var(--done); }
+  .check-fail { background: rgba(224,85,97,.1); color: var(--blocked); }
+  .check-icon { flex-shrink: 0; }
+
+  .output-box {
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 14px;
+    white-space: pre-wrap; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px;
+    min-height: 200px; max-height: 520px; overflow-y: auto; color: var(--txt);
+  }
+  .empty-msg { color: var(--muted); font-style: italic; }
+
+  .output-actions { display: flex; gap: 10px; margin-top: 12px; align-items: center; }
+  .btn-copy {
+    background: rgba(63,185,80,.15); color: var(--done); border: 1px solid rgba(63,185,80,.35);
+    border-radius: 6px; padding: 8px 16px; cursor: pointer; font-size: 13px; font-weight: 700;
+  }
+  .btn-copy:hover { background: rgba(63,185,80,.28); }
+  .copy-feedback { font-size: 12px; color: var(--muted); }
+
+  footer { margin-top: 32px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>🐞 Defect Helper</h1>
+  <p class="sub">ตัวช่วยเขียน Bug / Defect Report ให้ครบถ้วนและมีคุณภาพ — กรอกฟอร์มด้านซ้าย แล้วกด Generate เพื่อสร้างรายงานที่พร้อมแปะลง tracker</p>
+
+  <div class="layout">
+
+    <!-- ═══════════ ฟอร์มกรอกข้อมูล ═══════════ -->
+    <div class="panel">
+      <h2>📝 กรอกรายละเอียด Defect</h2>
+
+      <label for="f-title">Title / Summary</label>
+      <p class="hint">รูปแบบที่ดี: "[โมดูล] อาการ + ที่ไหน + เมื่อไร" เช่น "[Checkout] ปุ่มชำระเงินไม่ทำงานเมื่อใช้คูปองหมดอายุ"</p>
+      <input type="text" id="f-title" placeholder="[โมดูล] อาการที่เกิด + บริบทที่เกิด">
+
+      <label>Environment</label>
+      <p class="hint">ระบุ OS / Browser / เวอร์ชัน build ให้ชัดเจน — ช่วยให้ dev reproduce ได้ตรงจุด</p>
+      <div class="row3">
+        <input type="text" id="f-os" placeholder="OS เช่น Windows 11 / macOS 14">
+        <input type="text" id="f-browser" placeholder="Browser เช่น Chrome 126">
+        <input type="text" id="f-build" placeholder="Build/Version เช่น v2.4.1-rc3">
+      </div>
+
+      <label for="f-precond">Preconditions</label>
+      <p class="hint">สภาพแวดล้อม/สถานะก่อนเริ่มทำซ้ำ เช่น login ด้วย role อะไร, มีข้อมูลอะไรอยู่ก่อนแล้ว</p>
+      <textarea id="f-precond" placeholder="เช่น: login ด้วยบัญชี role=admin, มีสินค้าค้างอยู่ใน cart 1 ชิ้น"></textarea>
+
+      <label>Steps to Reproduce</label>
+      <p class="hint">1 action ต่อ 1 บรรทัด เริ่มจาก state ที่ชัดเจน ระบุค่าที่กรอกจริงถ้าเกี่ยวข้อง</p>
+      <div class="steps-list" id="steps-list"></div>
+      <button type="button" class="btn-add" id="btn-add-step">+ เพิ่ม Step</button>
+
+      <label for="f-expected">Expected Result</label>
+      <p class="hint">ระบบควรทำอะไร — อ้างอิงจาก spec/requirement ถ้ามี</p>
+      <textarea id="f-expected" placeholder="เช่น: ระบบแสดงข้อความแจ้งเตือน 'คูปองหมดอายุ' และปุ่มชำระเงินยังกดต่อได้"></textarea>
+
+      <label for="f-actual">Actual Result</label>
+      <p class="hint">สิ่งที่เกิดขึ้นจริง — เจาะจง ไม่คลุมเครือ (หลีกเลี่ยง "ไม่ทำงาน" เฉยๆ)</p>
+      <textarea id="f-actual" placeholder="เช่น: หน้าจอค้าง ปุ่มชำระเงินกดไม่ได้ ไม่มี error message ใดๆ"></textarea>
+
+      <div class="row3">
+        <div>
+          <label for="f-severity">Severity</label>
+          <select id="f-severity">
+            <option value="">-- เลือก --</option>
+            <option value="Critical">Critical</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+        </div>
+        <div>
+          <label for="f-priority">Priority</label>
+          <select id="f-priority">
+            <option value="">-- เลือก --</option>
+            <option value="Critical">Critical</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+        </div>
+        <div>
+          <label for="f-repro">Reproducibility</label>
+          <select id="f-repro">
+            <option value="">-- เลือก --</option>
+            <option value="Always">Always (100%)</option>
+            <option value="Sometimes">Sometimes</option>
+            <option value="Once">Once (พบครั้งเดียว)</option>
+          </select>
+        </div>
+      </div>
+
+      <label for="f-evidence">Attachments / Evidence note</label>
+      <p class="hint">อธิบายว่ามีหลักฐานอะไรแนบ (screenshot, log, video) แม้ไฟล์แนบจริงต้องอัปโหลดแยกใน tracker</p>
+      <textarea id="f-evidence" placeholder="เช่น: แนบ screenshot 2 รูป + console log (network tab แสดง 500 error ที่ /api/checkout)"></textarea>
+
+      <button type="button" class="btn-generate" id="btn-generate">⚙️ Generate Defect Report</button>
+    </div>
+
+    <!-- ═══════════ ผลลัพธ์ ═══════════ -->
+    <div class="panel">
+      <div class="toggle-row">
+        <h2 style="border:none; padding:0; margin:0;">📄 Defect Report</h2>
+        <div class="lang-toggle">
+          <button type="button" id="btn-lang-th" class="active" data-lang="th">TH</button>
+          <button type="button" id="btn-lang-en" data-lang="en">EN</button>
+        </div>
+      </div>
+
+      <div class="score-box">
+        <div class="score-num" id="score-num">--</div>
+        <div class="score-bar"><span id="score-bar-fill" style="width:0%; background:var(--muted);"></span></div>
+      </div>
+
+      <div class="checklist" id="checklist">
+        <p class="hint" style="margin:0;">กด Generate เพื่อตรวจสอบคุณภาพ defect ของคุณ</p>
+      </div>
+
+      <div class="output-box" id="output-box"><span class="empty-msg">ยังไม่มีรายงาน — กรอกฟอร์มด้านซ้ายแล้วกด "Generate Defect Report"</span></div>
+
+      <div class="output-actions">
+        <button type="button" class="btn-copy" id="btn-copy">📋 Copy to Clipboard</button>
+        <span class="copy-feedback" id="copy-feedback"></span>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    เครื่องมือนี้ทำงานทั้งหมดในเบราว์เซอร์ ไม่มีการส่งข้อมูลออกไปที่ใด (ไม่มี external dependency / ไม่มีการเชื่อมต่อเน็ต)
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var currentLang = 'th';
+  var stepsList = document.getElementById('steps-list');
+  var stepCounter = 0;
+
+  // ---------- Steps: add / remove ----------
+  function addStep(value) {
+    stepCounter++;
+    var row = document.createElement('div');
+    row.className = 'step-row';
+
+    var num = document.createElement('span');
+    num.className = 'step-num';
+    num.textContent = '';
+
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'step-input';
+    input.placeholder = 'เช่น: คลิกปุ่ม "ชำระเงิน" ที่หน้า checkout';
+    if (value) input.value = value;
+
+    var del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'step-del';
+    del.textContent = '✕';
+    del.addEventListener('click', function () {
+      row.remove();
+      renumberSteps();
+    });
+
+    row.appendChild(num);
+    row.appendChild(input);
+    row.appendChild(del);
+    stepsList.appendChild(row);
+    renumberSteps();
+  }
+
+  function renumberSteps() {
+    var rows = stepsList.querySelectorAll('.step-row');
+    rows.forEach(function (row, idx) {
+      row.querySelector('.step-num').textContent = (idx + 1) + '.';
+    });
+  }
+
+  function getSteps() {
+    var inputs = stepsList.querySelectorAll('.step-input');
+    var steps = [];
+    inputs.forEach(function (inp) {
+      var v = inp.value.trim();
+      if (v) steps.push(v);
+    });
+    return steps;
+  }
+
+  document.getElementById('btn-add-step').addEventListener('click', function () { addStep(''); });
+
+  // seed with 3 empty steps to start
+  addStep('');
+  addStep('');
+  addStep('');
+
+  // ---------- Language toggle ----------
+  var btnLangTh = document.getElementById('btn-lang-th');
+  var btnLangEn = document.getElementById('btn-lang-en');
+
+  function setLang(lang) {
+    currentLang = lang;
+    btnLangTh.classList.toggle('active', lang === 'th');
+    btnLangEn.classList.toggle('active', lang === 'en');
+    // re-generate if there's already output
+    if (lastGenerated) generateReport();
+  }
+  btnLangTh.addEventListener('click', function () { setLang('th'); });
+  btnLangEn.addEventListener('click', function () { setLang('en'); });
+
+  // ---------- Labels for output (TH/EN) ----------
+  var LABELS = {
+    th: {
+      title: 'หัวข้อ / สรุป', environment: 'สภาพแวดล้อม', os: 'OS', browser: 'Browser', build: 'Build/Version',
+      preconditions: 'เงื่อนไขก่อนหน้า', steps: 'ขั้นตอนการทำซ้ำ', expected: 'ผลลัพธ์ที่คาดหวัง',
+      actual: 'ผลลัพธ์ที่เกิดขึ้นจริง', severity: 'ระดับความรุนแรง', priority: 'ระดับความสำคัญ',
+      reproducibility: 'ความสามารถในการทำซ้ำ', evidence: 'หลักฐาน/ไฟล์แนบ', notFilled: '(ไม่ได้ระบุ)',
+      noSteps: '(ไม่ได้ระบุ steps)'
+    },
+    en: {
+      title: 'Title / Summary', environment: 'Environment', os: 'OS', browser: 'Browser', build: 'Build/Version',
+      preconditions: 'Preconditions', steps: 'Steps to Reproduce', expected: 'Expected Result',
+      actual: 'Actual Result', severity: 'Severity', priority: 'Priority',
+      reproducibility: 'Reproducibility', evidence: 'Attachments / Evidence', notFilled: '(not specified)',
+      noSteps: '(no steps specified)'
+    }
+  };
+
+  // ---------- Quality checklist ----------
+  var GENERIC_TITLE_WORDS = ['bug', 'error', 'ไม่ทำงาน', 'พัง', 'มีปัญหา', 'ผิดพลาด', 'issue'];
+
+  function runQualityChecks(data) {
+    var checks = [];
+
+    // 1. Title length + genericness
+    var titleTrim = data.title.trim();
+    var titleTooShort = titleTrim.length < 15;
+    var titleIsGeneric = GENERIC_TITLE_WORDS.some(function (w) {
+      return titleTrim.toLowerCase() === w.toLowerCase();
+    });
+    checks.push({
+      pass: titleTrim.length > 0 && !titleTooShort && !titleIsGeneric,
+      labelTh: 'Title มีรายละเอียดเพียงพอ (ไม่สั้น/กว้างเกินไป)',
+      labelEn: 'Title is specific enough (not too short/generic)'
+    });
+
+    // 2. Steps present
+    checks.push({
+      pass: data.steps.length > 0,
+      labelTh: 'มี Steps to Reproduce อย่างน้อย 1 ขั้นตอน',
+      labelEn: 'Has at least 1 Step to Reproduce'
+    });
+
+    // 3. Expected filled
+    checks.push({
+      pass: data.expected.trim().length > 0,
+      labelTh: 'ระบุ Expected Result แล้ว',
+      labelEn: 'Expected Result is filled'
+    });
+
+    // 4. Actual filled
+    checks.push({
+      pass: data.actual.trim().length > 0,
+      labelTh: 'ระบุ Actual Result แล้ว',
+      labelEn: 'Actual Result is filled'
+    });
+
+    // 5. Expected != Actual
+    var expNorm = data.expected.trim().toLowerCase();
+    var actNorm = data.actual.trim().toLowerCase();
+    var sameText = expNorm.length > 0 && expNorm === actNorm;
+    checks.push({
+      pass: !sameText,
+      labelTh: 'Expected และ Actual ไม่เหมือนกันเป๊ะ',
+      labelEn: 'Expected and Actual are not identical'
+    });
+
+    // 6. Severity selected
+    checks.push({
+      pass: data.severity.trim().length > 0,
+      labelTh: 'เลือก Severity แล้ว',
+      labelEn: 'Severity is selected'
+    });
+
+    return checks;
+  }
+
+  function renderChecklist(checks) {
+    var box = document.getElementById('checklist');
+    box.innerHTML = '';
+    checks.forEach(function (c) {
+      var item = document.createElement('div');
+      item.className = 'check-item ' + (c.pass ? 'check-pass' : 'check-fail');
+      var icon = document.createElement('span');
+      icon.className = 'check-icon';
+      icon.textContent = c.pass ? '✅' : '⚠️';
+      var label = document.createElement('span');
+      label.textContent = currentLang === 'th' ? c.labelTh : c.labelEn;
+      item.appendChild(icon);
+      item.appendChild(label);
+      box.appendChild(item);
+    });
+
+    var passCount = checks.filter(function (c) { return c.pass; }).length;
+    var pct = Math.round((passCount / checks.length) * 100);
+
+    var scoreNum = document.getElementById('score-num');
+    var scoreBar = document.getElementById('score-bar-fill');
+    scoreNum.textContent = pct + '%';
+    scoreBar.style.width = pct + '%';
+
+    var colorClass, colorVar;
+    if (pct >= 80) { colorClass = 'score-good'; colorVar = 'var(--done)'; }
+    else if (pct >= 50) { colorClass = 'score-mid'; colorVar = 'var(--warn)'; }
+    else { colorClass = 'score-bad'; colorVar = 'var(--blocked)'; }
+    scoreNum.className = 'score-num ' + colorClass;
+    scoreBar.style.background = colorVar;
+  }
+
+  // ---------- Generate report ----------
+  var lastGenerated = false;
+
+  function collectData() {
+    return {
+      title: document.getElementById('f-title').value,
+      os: document.getElementById('f-os').value,
+      browser: document.getElementById('f-browser').value,
+      build: document.getElementById('f-build').value,
+      preconditions: document.getElementById('f-precond').value,
+      steps: getSteps(),
+      expected: document.getElementById('f-expected').value,
+      actual: document.getElementById('f-actual').value,
+      severity: document.getElementById('f-severity').value,
+      priority: document.getElementById('f-priority').value,
+      repro: document.getElementById('f-repro').value,
+      evidence: document.getElementById('f-evidence').value
+    };
+  }
+
+  function buildReportText(data, lang) {
+    var L = LABELS[lang];
+    var lines = [];
+
+    lines.push('## ' + L.title);
+    lines.push(data.title.trim() || L.notFilled);
+    lines.push('');
+
+    lines.push('## ' + L.environment);
+    lines.push(L.os + ': ' + (data.os.trim() || L.notFilled));
+    lines.push(L.browser + ': ' + (data.browser.trim() || L.notFilled));
+    lines.push(L.build + ': ' + (data.build.trim() || L.notFilled));
+    lines.push('');
+
+    lines.push('## ' + L.preconditions);
+    lines.push(data.preconditions.trim() || L.notFilled);
+    lines.push('');
+
+    lines.push('## ' + L.steps);
+    if (data.steps.length > 0) {
+      data.steps.forEach(function (s, i) {
+        lines.push((i + 1) + '. ' + s);
+      });
+    } else {
+      lines.push(L.noSteps);
+    }
+    lines.push('');
+
+    lines.push('## ' + L.expected);
+    lines.push(data.expected.trim() || L.notFilled);
+    lines.push('');
+
+    lines.push('## ' + L.actual);
+    lines.push(data.actual.trim() || L.notFilled);
+    lines.push('');
+
+    lines.push('## ' + L.severity + ' / ' + L.priority + ' / ' + L.reproducibility);
+    lines.push(L.severity + ': ' + (data.severity || L.notFilled));
+    lines.push(L.priority + ': ' + (data.priority || L.notFilled));
+    lines.push(L.reproducibility + ': ' + (data.repro || L.notFilled));
+    lines.push('');
+
+    lines.push('## ' + L.evidence);
+    lines.push(data.evidence.trim() || L.notFilled);
+
+    return lines.join('\n');
+  }
+
+  var lastData = null;
+
+  function generateReport() {
+    var data = collectData();
+    lastData = data;
+    lastGenerated = true;
+
+    var checks = runQualityChecks(data);
+    renderChecklist(checks);
+
+    var text = buildReportText(data, currentLang);
+    var box = document.getElementById('output-box');
+    box.textContent = text;
+  }
+
+  document.getElementById('btn-generate').addEventListener('click', generateReport);
+
+  // ---------- Copy to clipboard ----------
+  function copyToClipboard() {
+    var box = document.getElementById('output-box');
+    var text = box.textContent;
+    var feedback = document.getElementById('copy-feedback');
+
+    if (!lastGenerated || !text || text.indexOf('ยังไม่มีรายงาน') !== -1) {
+      feedback.textContent = currentLang === 'th' ? 'กรุณา Generate รายงานก่อน' : 'Please generate the report first';
+      setTimeout(function () { feedback.textContent = ''; }, 2500);
+      return;
+    }
+
+    function showSuccess() {
+      feedback.textContent = currentLang === 'th' ? '✅ คัดลอกแล้ว!' : '✅ Copied!';
+      setTimeout(function () { feedback.textContent = ''; }, 2000);
+    }
+    function showFailure() {
+      feedback.textContent = currentLang === 'th' ? '❌ คัดลอกไม่สำเร็จ' : '❌ Copy failed';
+      setTimeout(function () { feedback.textContent = ''; }, 2500);
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(showSuccess, function () {
+        fallbackCopy(text, showSuccess, showFailure);
+      });
+    } else {
+      fallbackCopy(text, showSuccess, showFailure);
+    }
+  }
+
+  function fallbackCopy(text, onSuccess, onFailure) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (ok) { onSuccess(); } else { onFailure(); }
+    } catch (e) {
+      onFailure();
+    }
+  }
+
+  document.getElementById('btn-copy').addEventListener('click', copyToClipboard);
+
+})();
+</script>
+</body>
+</html>
