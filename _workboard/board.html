@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workboard — Kanban จำลอง (no-DB mode)</title>
+<style>
+  :root {
+    --bg: #0f1419; --panel: #1a2028; --panel2: #222b35; --line: #2d3742;
+    --txt: #e6edf3; --muted: #8b98a5; --accent: #4a9eff;
+    --todo: #6b7684; --prog: #d9a441; --review: #4a9eff; --blocked: #e05561; --done: #3fb950;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; background: var(--bg); color: var(--txt);
+    font-family: -apple-system, "Segoe UI", "Noto Sans Thai", Tahoma, sans-serif;
+    line-height: 1.55; font-size: 15px;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 18px; margin: 32px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 8px; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 4px;
+          background: var(--panel); border-radius: 8px; overflow: hidden; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { background: var(--panel2); color: var(--muted); font-weight: 600; font-size: 12px;
+       text-transform: uppercase; letter-spacing: .04em; }
+  tr:last-child td { border-bottom: none; }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 12px;
+           font-weight: 600; white-space: nowrap; }
+  .b-todo    { background: rgba(107,118,132,.2); color: #adb6c0; }
+  .b-prog    { background: rgba(217,164,65,.18); color: var(--prog); }
+  .b-review  { background: rgba(74,158,255,.18); color: var(--review); }
+  .b-blocked { background: rgba(224,85,97,.18); color: var(--blocked); }
+  .b-done    { background: rgba(63,185,80,.18); color: var(--done); }
+  .prio-high { color: var(--blocked); font-weight: 600; }
+  .prio-med  { color: var(--prog); }
+  .prio-low  { color: var(--muted); }
+  code, .agent { background: var(--panel2); padding: 1px 6px; border-radius: 4px;
+                 font-family: "SF Mono", Menlo, monospace; font-size: 12px; }
+  .bar { position: relative; height: 8px; width: 90px; background: var(--panel2);
+         border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 8px; }
+  .bar > span { position: absolute; left: 0; top: 0; bottom: 0; background: var(--done); border-radius: 4px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+          padding: 16px 18px; margin: 14px 0; }
+  .card h3 { margin: 0 0 10px; font-size: 16px; }
+  .meta { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+  .ac-pass { color: var(--done); } .ac-pend { color: var(--muted); }
+  .ac-fail { color: var(--blocked); } .ac-na { color: var(--muted); }
+  .note { color: var(--muted); font-size: 12px; font-style: italic; }
+  .example-tag { background: rgba(217,164,65,.15); color: var(--prog); font-size: 11px;
+                 padding: 2px 8px; border-radius: 4px; margin-left: 8px; }
+  footer { margin-top: 40px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>🗂️ Workboard</h1>
+  <p class="sub">Kanban จำลองแบบไฟล์ — ใช้แทนหน้า UI เมื่อรัน agent ผ่าน session โดยไม่เปิด backend/DB ของ platform จริง</p>
+
+  <div class="legend">
+    <span class="badge b-todo">⚪ TODO</span>
+    <span class="badge b-prog">🟡 IN PROGRESS</span>
+    <span class="badge b-review">🔵 REVIEW</span>
+    <span class="badge b-blocked">🔴 BLOCKED</span>
+    <span class="badge b-done">🟢 DONE</span>
+  </div>
+
+  <!-- ═══════════════ ชั้น 1: PROJECT INDEX ═══════════════ -->
+  <h2>📋 Project Index</h2>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Project</th><th>Team</th><th>สถานะ</th><th>ความคืบหน้า</th></tr>
+    </thead>
+    <tbody>
+      <!-- ตัวอย่าง (ลบออกได้เมื่อมี project จริง) -->
+      <tr>
+        <td>1</td>
+        <td><code>auth-system</code> <span class="example-tag">ตัวอย่าง</span></td>
+        <td>dev</td>
+        <td><span class="badge b-prog">🟡 Active</span></td>
+        <td><span class="bar"><span style="width:33%"></span></span>1/3</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="note">↑ แถวตัวอย่าง — เมื่อมี project จริง Lead จะเพิ่ม/แก้แถวที่นี่ให้ตรงกับ board ด้านล่าง</p>
+
+  <!-- ═══════════════ ชั้น 2: PROJECT BOARDS ═══════════════ -->
+  <h2>🔹 Project 1: <code>auth-system</code> <span class="example-tag">ตัวอย่าง</span></h2>
+  <div class="card">
+    <p class="meta"><strong>Team:</strong> dev &nbsp;·&nbsp; <strong>คำอธิบาย:</strong> ระบบ login/token สำหรับแอปหลัก &nbsp;·&nbsp; <strong>สถานะ:</strong> 🟡 Active</p>
+    <table>
+      <thead>
+        <tr><th>#</th><th>Task</th><th>สถานะ</th><th>Priority</th><th>Agent</th><th>AC</th><th>รอ</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1.1</td><td>เข้าใจ business req: login flow</td>
+          <td><span class="badge b-done">🟢 DONE</span></td>
+          <td class="prio-high">High</td><td><span class="agent">dev-analyst</span></td><td>3/3</td><td>—</td>
+        </tr>
+        <tr>
+          <td>1.2</td><td>Review test cases: auth endpoint</td>
+          <td><span class="badge b-prog">🟡 IN&nbsp;PROGRESS</span></td>
+          <td class="prio-high">High</td><td><span class="agent">dev-tester</span></td><td>1/4</td><td>—</td>
+        </tr>
+        <tr>
+          <td>1.3</td><td>แก้บั๊ก token หมดอายุ (401)</td>
+          <td><span class="badge b-blocked">🔴 BLOCKED</span></td>
+          <td class="prio-high">High</td><td>—</td><td>0/3</td><td>1.2</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="meta" style="margin-top:14px;"><strong>🔍 AC ของ task 1.2</strong> — Review test cases: auth endpoint</p>
+    <table>
+      <thead>
+        <tr><th>#</th><th>เกณฑ์</th><th>สถานะ</th><th>ตรวจโดย</th><th>หลักฐาน</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>AC1</td><td>ครอบคลุม case: creds ถูก/ผิด/ว่าง</td><td class="ac-pass">✅ passed</td><td><span class="agent">dev-tester</span></td><td>test_auth.py:20-58</td></tr>
+        <tr><td>AC2</td><td>มี test token หมดอายุ (401)</td><td class="ac-pend">⬜ pending</td><td>—</td><td>—</td></tr>
+        <tr><td>AC3</td><td>ตรวจ edge case: rate-limit / brute force</td><td class="ac-pend">⬜ pending</td><td>—</td><td>—</td></tr>
+        <tr><td>AC4</td><td>ไม่มี test ซ้ำซ้อน / flaky</td><td class="ac-pend">⬜ pending</td><td>—</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer>
+    <strong>วิธีใช้:</strong> ทุกครั้งที่งานเดินหน้า Lead จะแก้ไฟล์นี้ (badge สี, ตัวเลข AC, progress bar) แล้ว commit/push เก็บถาวรผ่าน git &nbsp;·&nbsp;
+    เปิดไฟล์ด้วย browser เพื่ออ่าน &nbsp;·&nbsp; แถวที่ติดป้าย <span class="example-tag">ตัวอย่าง</span> ลบออกได้เมื่อเริ่ม project จริง
+  </footer>
+
+</div>
+</body>
+</html>
